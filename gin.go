@@ -13,12 +13,17 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin/internal/bytesconv"
 	"github.com/gin-gonic/gin/render"
 )
 
-const defaultMultipartMemory = 32 << 20 // 32 MB
+const (
+	defaultMultipartMemory = 32 << 20 // 32 MB
+	defaultReadTimeout     = 15 * time.Second
+	defaultWriteTimeout    = 30 * time.Second
+)
 
 var (
 	default404Body = []byte("404 page not found")
@@ -332,8 +337,16 @@ func (engine *Engine) Run(addr ...string) (err error) {
 	}
 	engine.trustedCIDRs = trustedCIDRs
 	address := resolveAddress(addr)
-	debugPrint("Listening and serving HTTP on %s\n", address)
-	err = http.ListenAndServe(address, engine)
+	debugPrint("Listening and serving HTTP on %s\n", addr)
+
+	server := &http.Server{
+		Addr:         address,
+		Handler:      engine,
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+	}
+
+	err = server.ListenAndServe()
 	return
 }
 
@@ -387,7 +400,14 @@ func (engine *Engine) RunTLS(addr, certFile, keyFile string) (err error) {
 	debugPrint("Listening and serving HTTPS on %s\n", addr)
 	defer func() { debugPrintError(err) }()
 
-	err = http.ListenAndServeTLS(addr, certFile, keyFile, engine)
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      engine,
+		ReadTimeout:  defaultReadTimeout,
+		WriteTimeout: defaultWriteTimeout,
+	}
+
+	err = server.ListenAndServeTLS(certFile, keyFile)
 	return
 }
 
